@@ -9,9 +9,9 @@ import { InputText } from 'primereact/inputtext';
 import { Toast } from 'primereact/toast';
 import { Toolbar } from 'primereact/toolbar';
 import { classNames } from 'primereact/utils';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Projeto } from '@/types';
-import { UsuarioService } from '@/service/UsuarioService';
+import { UsuarioService } from '../../../../service/UsuarioService';
 
 const Usuario = () => {
     let usuarioVazio: Projeto.Usuario = {
@@ -19,10 +19,10 @@ const Usuario = () => {
         nome: '',
         login: '',
         senha: '',
-        email: '',
+        email: ''
     };
 
-    const [usuarios, setUsuarios] = useState<Projeto.Usuario[]>([]);
+    const [usuarios, setUsuarios] = useState<Projeto.Usuario[] | null>(null);
     const [usuarioDialog, setUsuarioDialog] = useState(false);
     const [deleteUsuarioDialog, setDeleteUsuarioDialog] = useState(false);
     const [deleteUsuariosDialog, setDeleteUsuariosDialog] = useState(false);
@@ -32,19 +32,19 @@ const Usuario = () => {
     const [globalFilter, setGlobalFilter] = useState('');
     const toast = useRef<Toast>(null);
     const dt = useRef<DataTable<any>>(null);
-    const usuarioService = new UsuarioService();
+    const usuarioService = useMemo(() => new UsuarioService(), []);
 
     useEffect(() => {
-       if(usuarios.length == 0) {
-       usuarioService.listarTodos()
-       .then((response) => {
-            console.log(response.data);
-            setUsuarios(response.data)
-       }).catch((error) => {
-            console.log(error);
-       })
-    }
-    }, [usuarios]);
+        if (!usuarios) {
+            usuarioService.listarTodos()
+                .then((response) => {
+                    console.log(response.data);
+                    setUsuarios(response.data);
+                }).catch((error) => {
+                    console.log(error);
+                })
+        }
+    }, [usuarioService, usuarios]);
 
     const openNew = () => {
         setUsuario(usuarioVazio);
@@ -69,41 +69,43 @@ const Usuario = () => {
         setSubmitted(true);
 
         if (!usuario.id) {
-            usuarioService.inserir(usuario).then((response) => {
-                setUsuarioDialog(false);
-                setUsuario(usuarioVazio);
-                setUsuarios([]);
-                toast.current?.show({
-                    severity: 'info',
-                    summary: 'Sucesso!',
-                    detail: 'Usuário cadastrado com sucesso!'
+            usuarioService.inserir(usuario)
+                .then((response) => {
+                    setUsuarioDialog(false);
+                    setUsuario(usuarioVazio);
+                    setUsuarios(null);
+                    toast.current?.show({
+                        severity: 'info',
+                        summary: 'Sucesso!',
+                        detail: 'Usuário cadastrado com sucesso!'
+                    });
+                }).catch((error) => {
+                    console.log(error.data.message);
+                    toast.current?.show({
+                        severity: 'error',
+                        summary: 'Erro!',
+                        detail: 'Erro ao salvar!' + error.data.message
+                    })
                 });
-            }).catch((error) => { 
-                console.log(error.data.message);
-                toast.current?.show({  
-                    severity: 'error',
-                    summary: 'Erro!',
-                    detail: 'Erro ao salvar! ' + error.data.message
-                });
-            });
         } else {
-            usuarioService.alterar(usuario).then((response) => {
-                setUsuarioDialog(false);
-                setUsuario(usuarioVazio);
-                setUsuarios([]);
-                toast.current?.show({
-                    severity: 'info',
-                    summary: 'Sucesso!',
-                    detail: 'Usuário alterado com sucesso!'
-                });
-            }).catch((error) => {
-                console.log(error.data.message);
-                toast.current?.show({  
-                    severity: 'error',
-                    summary: 'Erro!',
-                    detail: 'Erro ao alterar! ' + error.data.message
-                });
-            }) 
+            usuarioService.alterar(usuario)
+                .then((response) => {
+                    setUsuarioDialog(false);
+                    setUsuario(usuarioVazio);
+                    setUsuarios(null);
+                    toast.current?.show({
+                        severity: 'info',
+                        summary: 'Sucesso!',
+                        detail: 'Usuário alterado com sucesso!'
+                    });
+                }).catch((error) => {
+                    console.log(error.data.message);
+                    toast.current?.show({
+                        severity: 'error',
+                        summary: 'Erro!',
+                        detail: 'Erro ao alterar!' + error.data.message
+                    })
+                })
         }
     }
 
@@ -118,30 +120,27 @@ const Usuario = () => {
     };
 
     const deleteUsuario = () => {
-        if(usuario.id) {
-    usuarioService.excluir(usuario.id).then((response) => {
-        setUsuario(usuarioVazio);
-        setDeleteUsuarioDialog(false);
-
-        // Atualiza a lista de usuários, removendo o usuário deletado
-        setUsuarios(prevUsuarios => prevUsuarios.filter(u => u.id !== usuario.id));
-
-        toast.current?.show({
-            severity: 'success',
-            summary: 'Sucesso!',
-            detail: 'Usuário Deletado com Sucesso!',
-            life: 3000
-        });
-    }).catch((error) => {
-        toast.current?.show({
-            severity: 'error',
-            summary: 'Erro!',
-            detail: 'Erro ao deletar o usuário!',
-            life: 3000
-        });
-    });
-    }
-};
+        if (usuario.id) {
+            usuarioService.excluir(usuario.id).then((response) => {
+                setUsuario(usuarioVazio);
+                setDeleteUsuarioDialog(false);
+                setUsuarios(null);
+                toast.current?.show({
+                    severity: 'success',
+                    summary: 'Sucesso!',
+                    detail: 'Usuário Deletado com Sucesso!',
+                    life: 3000
+                });
+            }).catch((error) => {
+                toast.current?.show({
+                    severity: 'error',
+                    summary: 'Erro!',
+                    detail: 'Erro ao deletar o usuário!',
+                    life: 3000
+                });
+            });
+        }
+    };
 
     const exportCSV = () => {
         dt.current?.exportCSV();
@@ -158,7 +157,7 @@ const Usuario = () => {
                 await usuarioService.excluir(_usuario.id);
             }
         })).then((response) => {
-            setUsuarios([]);
+            setUsuarios(null);
             setSelectedUsuarios([]);
             setDeleteUsuariosDialog(false);
             toast.current?.show({
@@ -183,6 +182,10 @@ const Usuario = () => {
         _usuario[`${name}`] = val;
 
         setUsuario(_usuario);
+        // setUsuario(prevUsuario => ({
+        //     ...prevUsuario,
+        //     [name]: val,
+        //   }));
     };
 
     const leftToolbarTemplate = () => {
@@ -325,7 +328,7 @@ const Usuario = () => {
                                     'p-invalid': submitted && !usuario.nome
                                 })}
                             />
-                            {submitted && !usuario.nome && <small className="p-invalid">Nome é obrigatório</small>}
+                            {submitted && !usuario.nome && <small className="p-invalid">Nome é obrigatório.</small>}
                         </div>
 
                         <div className="field">
@@ -340,7 +343,7 @@ const Usuario = () => {
                                     'p-invalid': submitted && !usuario.nome
                                 })}
                             />
-                            {submitted && !usuario.login && <small className="p-invalid">Login é obrigatório</small>}
+                            {submitted && !usuario.login && <small className="p-invalid">Login é obrigatório.</small>}
                         </div>
 
                         <div className="field">
@@ -355,7 +358,7 @@ const Usuario = () => {
                                     'p-invalid': submitted && !usuario.nome
                                 })}
                             />
-                            {submitted && !usuario.senha && <small className="p-invalid">Senha é obrigatório</small>}
+                            {submitted && !usuario.senha && <small className="p-invalid">Senha é obrigatório.</small>}
                         </div>
 
                         <div className="field">
@@ -370,8 +373,9 @@ const Usuario = () => {
                                     'p-invalid': submitted && !usuario.nome
                                 })}
                             />
-                            {submitted && !usuario.email && <small className="p-invalid">Email é obrigatório</small>}
+                            {submitted && !usuario.email && <small className="p-invalid">Email é obrigatório.</small>}
                         </div>
+
 
                     </Dialog>
 
@@ -380,7 +384,7 @@ const Usuario = () => {
                             <i className="pi pi-exclamation-triangle mr-3" style={{ fontSize: '2rem' }} />
                             {usuario && (
                                 <span>
-                                    Você realmente deseja excluir o usuário? <b>{usuario.nome}</b>?
+                                    Você realmente deseja excluir o usuario <b>{usuario.nome}</b>?
                                 </span>
                             )}
                         </div>
@@ -391,7 +395,7 @@ const Usuario = () => {
                             <i className="pi pi-exclamation-triangle mr-3" style={{ fontSize: '2rem' }} />
                             {usuario && <span>Você realmente deseja excluir os usuários selecionados?</span>}
                         </div>
-                        </Dialog>
+                    </Dialog>
                 </div>
             </div>
         </div>
